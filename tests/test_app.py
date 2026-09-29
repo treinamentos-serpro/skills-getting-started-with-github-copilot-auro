@@ -6,6 +6,7 @@ from src import app as app_module
 
 @pytest.fixture
 def client(monkeypatch):
+    monkeypatch.setenv("CANCELLATION_ADMIN_TOKEN", "test-admin-token")
     monkeypatch.setattr(
         app_module,
         "activities",
@@ -77,6 +78,7 @@ def test_cancel_signup_removes_participant(client):
     response = client.delete(
         "/activities/Chess Club/signup",
         params={"email": "current@school.edu"},
+        headers={"X-Admin-Token": "test-admin-token"},
     )
 
     assert response.status_code == 200
@@ -87,6 +89,7 @@ def test_cancel_signup_returns_404_for_missing_activity(client):
     response = client.delete(
         "/activities/Unknown Club/signup",
         params={"email": "student@school.edu"},
+        headers={"X-Admin-Token": "test-admin-token"},
     )
 
     assert response.status_code == 404
@@ -96,6 +99,17 @@ def test_cancel_signup_returns_404_for_unregistered_participant(client):
     response = client.delete(
         "/activities/Chess Club/signup",
         params={"email": "unknown@school.edu"},
+        headers={"X-Admin-Token": "test-admin-token"},
     )
 
     assert response.status_code == 404
+
+
+def test_cancel_signup_requires_admin_authentication(client):
+    response = client.delete(
+        "/activities/Chess Club/signup",
+        params={"email": "current@school.edu"},
+    )
+
+    assert response.status_code == 401
+    assert "current@school.edu" in client.get("/activities").json()["Chess Club"]["participants"]
