@@ -5,9 +5,10 @@ A super simple FastAPI application that allows students to view and sign up
 for extracurricular activities at Mergington High School.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
+import hmac
 import os
 from pathlib import Path
 
@@ -112,8 +113,20 @@ def signup_for_activity(activity_name: str, email: str):
 
 
 @app.delete("/activities/{activity_name}/signup")
-def cancel_activity_signup(activity_name: str, email: str):
+def cancel_activity_signup(
+    activity_name: str,
+    email: str,
+    admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+):
     """Cancel a student's signup for an activity"""
+    configured_admin_token = os.getenv("CANCELLATION_ADMIN_TOKEN")
+    if (
+        not configured_admin_token
+        or not admin_token
+        or not hmac.compare_digest(admin_token, configured_admin_token)
+    ):
+        raise HTTPException(status_code=401, detail="Administrator authentication required")
+
     if activity_name not in activities:
         raise HTTPException(status_code=404, detail="Activity not found")
 
