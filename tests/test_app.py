@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -71,6 +73,20 @@ def test_signup_returns_400_when_activity_is_full(client):
     )
 
     assert response.status_code == 400
+
+
+def test_concurrent_signups_respect_activity_capacity(client):
+    def signup():
+        return client.post(
+            "/activities/Chess Club/signup",
+            params={"email": "new@school.edu"},
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(lambda _: signup(), range(2)))
+
+    assert sorted(response.status_code for response in responses) == [200, 400]
+    assert client.get("/activities").json()["Chess Club"]["participants"].count("new@school.edu") == 1
 
 
 def test_cancel_signup_removes_participant(client):
